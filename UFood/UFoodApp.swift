@@ -7,12 +7,18 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 @main
 struct UFoodApp: App {
+    @State private var healthKitManager = HealthKitManager()
+    @AppStorage(AppStorageKey.language) private var selectedLanguageRaw = AppLanguage.system.rawValue
+
+    private var language: AppLanguage { .resolved(from: selectedLanguageRaw) }
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Product.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -26,6 +32,8 @@ struct UFoodApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(healthKitManager)
+                .environment(\.locale, language.locale ?? Locale.current)
         }
         .modelContainer(sharedModelContainer)
     }
