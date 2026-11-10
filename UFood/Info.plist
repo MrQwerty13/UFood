@@ -9,6 +9,8 @@
 		<string>deepseek</string>
 	</array>
 	<key>UIBackgroundModes</key>
-	<array/>
+	<array>
+		<string>healthkit</string>
+	</array>
 </dict>
 </plist>

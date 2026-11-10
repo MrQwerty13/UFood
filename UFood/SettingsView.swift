@@ -3,13 +3,14 @@
 //  UFood
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct SettingsView: View {
     @Environment(HealthKitManager.self) private var healthKit
     @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
-    @AppStorage(AppStorageKey.aiProvider) private var selectedAIProviderRaw = AIAssistant.Provider.chatGPT.rawValue
+    @AppStorage(AppStorageKey.aiProvider) private var selectedAIProviderRaw = AIAssistant.Provider
+        .chatGPT.rawValue
     @AppStorage(AppStorageKey.language) private var selectedLanguageRaw = AppLanguage.system.rawValue
     @AppStorage(AppStorageKey.displayName) private var displayName = ""
     @Query private var todaysProducts: [Product]
@@ -33,6 +34,7 @@ struct SettingsView: View {
         List {
             profileSection
             energySection
+            foodPresetsSection
             themesSection
             aiProviderSection
             languageSection
@@ -140,6 +142,16 @@ struct SettingsView: View {
         }
     }
 
+    private var foodPresetsSection: some View {
+        Section("Presets") {
+            NavigationLink {
+                FoodPresetManagementView()
+            } label: {
+                Label("Manage food presets", systemImage: "leaf")
+            }
+        }
+    }
+
     private var aiProviderSection: some View {
         Section("AI Provider") {
             ForEach(AIAssistant.Provider.allCases) { provider in
@@ -208,6 +220,229 @@ struct SettingsView: View {
     }
 }
 
+private struct FoodPresetManagementView: View {
+    private enum EditorSheet: Identifiable {
+        case add
+        case edit(FoodPreset)
+
+        var id: String {
+            switch self {
+            case .add: "add"
+            case .edit(let preset): preset.id
+            }
+        }
+
+        var preset: FoodPreset? {
+            switch self {
+            case .add: nil
+            case .edit(let preset): preset
+            }
+        }
+    }
+
+    @Environment(FoodPresetStore.self) private var presetStore
+    @State private var editorSheet: EditorSheet?
+    @State private var isConfirmingRestore = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        List {
+            ForEach(FoodPreset.Category.allCases) { category in
+                Section(category.title) {
+                    ForEach(presetStore.presets(for: category)) { preset in
+                        Button {
+                            editorSheet = .edit(preset)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(preset.name)
+                                        .foregroundStyle(.primary)
+                                    Text("\(preset.kkalsPer100g) kcal/100g · \(preset.defaultGrams) g")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "pencil")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .onDelete { offsets in
+                        let presets = presetStore.presets(for: category)
+                        let presetsToDelete = offsets.compactMap {
+                            presets.indices.contains($0) ? presets[$0] : nil
+                        }
+                        for preset in presetsToDelete {
+                            do {
+                                try presetStore.delete(preset)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Food Presets")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Button("Restore built-in presets", systemImage: "arrow.counterclockwise") {
+                        isConfirmingRestore = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    editorSheet = .add
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add Preset")
+            }
+        }
+        .sheet(item: $editorSheet) { sheet in
+            NavigationStack {
+                FoodPresetEditorView(preset: sheet.preset)
+            }
+        }
+        .confirmationDialog(
+            "Restore built-in presets?",
+            isPresented: $isConfirmingRestore,
+            titleVisibility: .visible
+        ) {
+            Button("Restore built-in presets", role: .destructive) {
+                do {
+                    try presetStore.restoreBuiltInPresets()
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        } message: {
+            Text(
+                "This restores the original names and values and brings back deleted built-in presets. Your custom presets stay."
+            )
+        }
+        .alert(
+            "Preset error",
+            isPresented: Binding(
+                get: { errorMessage != nil || presetStore.errorMessage != nil },
+                set: {
+                    if !$0 {
+                        errorMessage = nil
+                        presetStore.clearError()
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                errorMessage = nil
+                presetStore.clearError()
+            }
+        } message: {
+            Text(errorMessage ?? presetStore.errorMessage ?? "")
+        }
+    }
+}
+
+private struct FoodPresetEditorView: View {
+    @Environment(FoodPresetStore.self) private var presetStore
+    @Environment(\.dismiss) private var dismiss
+
+    private let preset: FoodPreset?
+    @State private var name: String
+    @State private var kkalsPer100gText: String
+    @State private var defaultGramsText: String
+    @State private var category: FoodPreset.Category
+    @State private var errorMessage: String?
+
+    init(preset: FoodPreset?) {
+        self.preset = preset
+        _name = State(initialValue: preset?.name ?? "")
+        _kkalsPer100gText = State(initialValue: preset.map { String($0.kkalsPer100g) } ?? "")
+        _defaultGramsText = State(initialValue: preset.map { String($0.defaultGrams) } ?? "100")
+        _category = State(initialValue: preset?.category ?? .fruits)
+    }
+
+    private var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (Int(kkalsPer100gText) ?? 0) > 0
+            && (Int(defaultGramsText) ?? 0) > 0
+    }
+
+    var body: some View {
+        Form {
+            TextField("Name", text: $name)
+                .textInputAutocapitalization(.words)
+            TextField("kcal per 100g", text: $kkalsPer100gText)
+                .keyboardType(.numberPad)
+            TextField("Default grams", text: $defaultGramsText)
+                .keyboardType(.numberPad)
+            Picker("Category", selection: $category) {
+                ForEach(FoodPreset.Category.allCases) { category in
+                    Text(category.title).tag(category)
+                }
+            }
+        }
+        .navigationTitle(preset == nil ? "Add Preset" : "Edit Preset")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save", action: save)
+                    .fontWeight(.semibold)
+                    .disabled(!isValid)
+            }
+        }
+        .alert(
+            "Unable to save preset",
+            isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func save() {
+        guard let kkalsPer100g = Int(kkalsPer100gText),
+            let defaultGrams = Int(defaultGramsText)
+        else { return }
+
+        do {
+            if let preset {
+                try presetStore.update(
+                    preset,
+                    name: name,
+                    kkalsPer100g: kkalsPer100g,
+                    defaultGrams: defaultGrams,
+                    category: category
+                )
+            } else {
+                try presetStore.add(
+                    name: name,
+                    kkalsPer100g: kkalsPer100g,
+                    category: category,
+                    defaultGrams: defaultGrams
+                )
+            }
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 private struct EnergyStatRow: View {
     let title: String
     let subtitle: String
@@ -243,5 +478,6 @@ private struct EnergyStatRow: View {
         SettingsView()
     }
     .environment(HealthKitManager())
+    .environment(FoodPresetStore())
     .modelContainer(for: Product.self, inMemory: true)
 }

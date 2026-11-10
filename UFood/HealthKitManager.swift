@@ -17,6 +17,8 @@ final class HealthKitManager {
     var restingBurnedKcal: Int?
     var statusMessage: String?
     var isLoading = false
+    private var observerQueries: [HKObserverQuery] = []
+    private var isObservingHealthData = false
 
     init() {
         isAuthorized = UserDefaults.standard.bool(forKey: AppStorageKey.healthConnected)
@@ -58,6 +60,7 @@ final class HealthKitManager {
             try await store.requestAuthorization(toShare: writeTypes, read: readTypes)
             isAuthorized = true
             statusMessage = nil
+            startObservingHealthData()
             await refreshToday()
         } catch {
             statusMessage = error.localizedDescription
@@ -66,6 +69,7 @@ final class HealthKitManager {
 
     func refreshIfNeeded() async {
         guard isAuthorized else { return }
+        startObservingHealthData()
         await refreshToday()
     }
 
@@ -121,5 +125,35 @@ final class HealthKitManager {
         return try await descriptor.result(for: store)?
             .sumQuantity()?
             .doubleValue(for: .kilocalorie()) ?? 0
+    }
+
+    private func startObservingHealthData() {
+        guard isAvailable, isAuthorized, !isObservingHealthData else { return }
+        isObservingHealthData = true
+
+        for identifier in [HKQuantityTypeIdentifier.activeEnergyBurned, .basalEnergyBurned] {
+            guard let type = HKObjectType.quantityType(forIdentifier: identifier) else { continue }
+
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completion, error in
+                Task { @MainActor [weak self] in
+                    if let error {
+                        self?.statusMessage = error.localizedDescription
+                    } else {
+                        await self?.refreshToday()
+                    }
+                    completion()
+                }
+            }
+            observerQueries.append(query)
+            store.execute(query)
+
+            store.enableBackgroundDelivery(for: type, frequency: .hourly) { [weak self] success, error in
+                guard !success || error != nil else { return }
+                Task { @MainActor [weak self] in
+                    self?.statusMessage = error?.localizedDescription
+                        ?? "Could not enable hourly Apple Health updates."
+                }
+            }
+        }
     }
 }

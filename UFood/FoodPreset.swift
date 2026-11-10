@@ -4,9 +4,11 @@
 //
 
 import Foundation
+import Observation
+import os
 
-struct FoodPreset: Identifiable, Hashable {
-    enum Category: String, CaseIterable, Identifiable {
+struct FoodPreset: Identifiable, Hashable, Codable {
+    enum Category: String, CaseIterable, Identifiable, Codable {
         case fruits
         case vegetables
 
@@ -24,9 +26,24 @@ struct FoodPreset: Identifiable, Hashable {
     let kkalsPer100g: Int
     let category: Category
     let defaultGrams: Int
+    let nameOverride: String?
 
     var name: String {
-        appString("food.\(id)")
+        nameOverride ?? appString("food.\(id)")
+    }
+
+    init(
+        id: String,
+        kkalsPer100g: Int,
+        category: Category,
+        defaultGrams: Int,
+        nameOverride: String? = nil
+    ) {
+        self.id = id
+        self.kkalsPer100g = kkalsPer100g
+        self.category = category
+        self.defaultGrams = defaultGrams
+        self.nameOverride = nameOverride
     }
 
     static let all: [FoodPreset] = fruits + vegetables
@@ -65,6 +82,178 @@ struct FoodPreset: Identifiable, Hashable {
         switch category {
         case .fruits: fruits
         case .vegetables: vegetables
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class FoodPresetStore {
+    private struct Configuration: Codable {
+        var overrides: [String: PresetValues] = [:]
+        var customPresets: [FoodPreset] = []
+        var deletedPresetIDs: Set<String> = []
+    }
+
+    private struct PresetValues: Codable {
+        let name: String
+        let kkalsPer100g: Int
+        let defaultGrams: Int
+        let category: FoodPreset.Category
+    }
+
+    private enum PresetError: LocalizedError {
+        case invalidValues
+
+        var errorDescription: String? {
+            appString("Enter a name and positive kcal and gram values.")
+        }
+    }
+
+    private let defaults: UserDefaults
+    private var overrides: [String: PresetValues]
+    private var customPresets: [FoodPreset]
+    private var deletedPresetIDs: Set<String>
+    private(set) var errorMessage: String?
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+
+        if let data = defaults.data(forKey: AppStorageKey.foodPresets) {
+            do {
+                let configuration = try JSONDecoder().decode(Configuration.self, from: data)
+                overrides = configuration.overrides
+                customPresets = configuration.customPresets
+                deletedPresetIDs = configuration.deletedPresetIDs
+            } catch {
+                overrides = [:]
+                customPresets = []
+                deletedPresetIDs = []
+                errorMessage = error.localizedDescription
+                Logger(subsystem: Bundle.main.bundleIdentifier ?? "UFood", category: "presets")
+                    .error("Could not load food presets: \(error.localizedDescription, privacy: .public)")
+            }
+        } else {
+            overrides = [:]
+            customPresets = []
+            deletedPresetIDs = []
+        }
+    }
+
+    func presets(for category: FoodPreset.Category) -> [FoodPreset] {
+        let builtIn = FoodPreset.all.compactMap { preset -> FoodPreset? in
+            guard !deletedPresetIDs.contains(preset.id) else { return nil }
+            if let values = overrides[preset.id] {
+                return FoodPreset(
+                    id: preset.id,
+                    kkalsPer100g: values.kkalsPer100g,
+                    category: values.category,
+                    defaultGrams: values.defaultGrams,
+                    nameOverride: values.name
+                )
+            }
+            return preset
+        }.filter { $0.category == category }
+        return builtIn + customPresets.filter { $0.category == category }
+    }
+
+    func update(
+        _ preset: FoodPreset,
+        name: String,
+        kkalsPer100g: Int,
+        defaultGrams: Int,
+        category: FoodPreset.Category
+    ) throws {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, kkalsPer100g > 0, defaultGrams > 0 else {
+            throw PresetError.invalidValues
+        }
+
+        var configuration = currentConfiguration
+        if let index = configuration.customPresets.firstIndex(where: { $0.id == preset.id }) {
+            configuration.customPresets[index] = FoodPreset(
+                id: preset.id,
+                kkalsPer100g: kkalsPer100g,
+                category: category,
+                defaultGrams: defaultGrams,
+                nameOverride: trimmedName
+            )
+        } else {
+            configuration.overrides[preset.id] = PresetValues(
+                name: trimmedName,
+                kkalsPer100g: kkalsPer100g,
+                defaultGrams: defaultGrams,
+                category: category
+            )
+        }
+        try save(configuration)
+    }
+
+    func add(
+        name: String,
+        kkalsPer100g: Int,
+        category: FoodPreset.Category,
+        defaultGrams: Int
+    ) throws {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, kkalsPer100g > 0, defaultGrams > 0 else {
+            throw PresetError.invalidValues
+        }
+
+        var configuration = currentConfiguration
+        configuration.customPresets.append(
+            FoodPreset(
+                id: UUID().uuidString,
+                kkalsPer100g: kkalsPer100g,
+                category: category,
+                defaultGrams: defaultGrams,
+                nameOverride: trimmedName
+            )
+        )
+        try save(configuration)
+    }
+
+    func delete(_ preset: FoodPreset) throws {
+        var configuration = currentConfiguration
+        if configuration.customPresets.contains(where: { $0.id == preset.id }) {
+            configuration.customPresets.removeAll { $0.id == preset.id }
+        } else {
+            configuration.overrides.removeValue(forKey: preset.id)
+            configuration.deletedPresetIDs.insert(preset.id)
+        }
+        try save(configuration)
+    }
+
+    func restoreBuiltInPresets() throws {
+        var configuration = currentConfiguration
+        configuration.overrides = [:]
+        configuration.deletedPresetIDs = []
+        try save(configuration)
+    }
+
+    func clearError() {
+        errorMessage = nil
+    }
+
+    private var currentConfiguration: Configuration {
+        Configuration(
+            overrides: overrides,
+            customPresets: customPresets,
+            deletedPresetIDs: deletedPresetIDs
+        )
+    }
+
+    private func save(_ configuration: Configuration) throws {
+        do {
+            let data = try JSONEncoder().encode(configuration)
+            defaults.set(data, forKey: AppStorageKey.foodPresets)
+            overrides = configuration.overrides
+            customPresets = configuration.customPresets
+            deletedPresetIDs = configuration.deletedPresetIDs
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            throw error
         }
     }
 }

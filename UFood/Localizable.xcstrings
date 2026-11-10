@@ -2117,6 +2117,94 @@
         }
       }
     },
+    "Add Preset" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Voreinstellung hinzufügen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Preset" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Añadir preajuste" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Добавить пресет" } }
+      }
+    },
+    "Default grams" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Standardgramm" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Default grams" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Gramos predeterminados" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Граммы по умолчанию" } }
+      }
+    },
+    "Edit Preset" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Voreinstellung bearbeiten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Preset" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Editar preajuste" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Изменить пресет" } }
+      }
+    },
+    "Food Presets" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Lebensmittelvorlagen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Food Presets" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Preajustes de alimentos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Пресеты продуктов" } }
+      }
+    },
+    "Manage food presets" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Lebensmittelvorlagen verwalten" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Manage food presets" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Administrar preajustes de alimentos" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Управление пресетами продуктов" } }
+      }
+    },
+    "Preset error" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Fehler bei den Vorlagen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preset error" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Error en los preajustes" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Ошибка пресетов" } }
+      }
+    },
+    "Restore built-in presets" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Integrierte Vorlagen wiederherstellen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restore built-in presets" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Restaurar preajustes integrados" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Восстановить встроенные пресеты" } }
+      }
+    },
+    "Restore built-in presets?" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Integrierte Vorlagen wiederherstellen?" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restore built-in presets?" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Restaurar preajustes integrados?" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Восстановить встроенные пресеты?" } }
+      }
+    },
+    "This restores the original names and values and brings back deleted built-in presets. Your custom presets stay." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Stellt ursprüngliche Namen und Werte wieder her und bringt gelöschte integrierte Vorlagen zurück. Eigene Vorlagen bleiben erhalten." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This restores the original names and values and brings back deleted built-in presets. Your custom presets stay." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Restaura los nombres y valores originales y recupera los preajustes integrados eliminados. Tus preajustes personalizados se conservan." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Восстановит исходные названия и значения, а также удалённые встроенные пресеты. Ваши собственные пресеты сохранятся." } }
+      }
+    },
+    "Unable to save preset" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Vorlage kann nicht gespeichert werden" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to save preset" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se puede guardar el preajuste" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Не удалось сохранить пресет" } }
+      }
+    },
+    "Enter a name and positive kcal and gram values." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gib einen Namen sowie positive kcal- und Grammwerte ein." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter a name and positive kcal and gram values." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Introduce un nombre y valores positivos de kcal y gramos." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Введите название, а также положительные значения ккал и граммов." } }
+      }
+    },
     "Profile" : {
       "localizations" : {
         "de" : {

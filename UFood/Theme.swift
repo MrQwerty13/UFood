@@ -18,22 +18,28 @@ enum ColorPreset: String, CaseIterable, Identifiable {
         appString("theme.\(rawValue)")
     }
 
-    var hexes: [UInt32] {
+    var colors: [Color] {
         switch self {
         case .oceanMint:
-            [0x1951FC, 0x0076E6, 0x0092CE, 0x00AAB4, 0x00BF94, 0x22D36B]
+            [
+                Color("AccentColor"),
+                Color(hex: 0x0076E6),
+                Color(hex: 0x0092CE),
+                Color(hex: 0x00AAB4),
+                Color(hex: 0x00BF94),
+                Color(hex: 0x22D36B),
+            ]
         case .orangePink:
-            [0xFF7A00, 0xE67C63, 0xCE7A90, 0xB675B4, 0xA06CD6, 0x8B5CF6]
+            [0xFF7A00, 0xE67C63, 0xCE7A90, 0xB675B4, 0xA06CD6, 0x8B5CF6].map { Color(hex: $0) }
         case .blackWhite:
-            [0x000000, 0x161616, 0x484848, 0x808080, 0xBEBEBE, 0xFFFFFF]
+            [0x000000, 0x161616, 0x484848, 0x808080, 0xBEBEBE, 0xFFFFFF].map { Color(hex: $0) }
         case .shalfeiMint:
-            [0x7D9170, 0x88A483, 0x93B896, 0x9FCCAA, 0xAAE0BE, 0xB5F5D3]
+            [0x7D9170, 0x88A483, 0x93B896, 0x9FCCAA, 0xAAE0BE, 0xB5F5D3].map { Color(hex: $0) }
         case .redPink:
-            [0xE01E37, 0xE94E59, 0xF16F79, 0xF78B99, 0xFCA7B9, 0xFFC1DA]
+            [0xE01E37, 0xE94E59, 0xF16F79, 0xF78B99, 0xFCA7B9, 0xFFC1DA].map { Color(hex: $0) }
         }
     }
 
-    var colors: [Color] { hexes.map { Color(hex: $0) } }
     var primary: Color { colors[0] }
     var secondary: Color { colors[2] }
     var accent: Color { colors[3] }

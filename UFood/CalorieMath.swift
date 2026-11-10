@@ -30,4 +30,5 @@ enum AppStorageKey {
     static let healthConnected = "healthKitConnected"
     static let aiProvider = "preferredAIProvider"
     static let language = "appLanguage"
+    static let foodPresets = "foodPresets"
 }

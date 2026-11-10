@@ -13,6 +13,7 @@ struct AddFoodView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(HealthKitManager.self) private var healthKit
+    @Environment(FoodPresetStore.self) private var presetStore
     @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
     @AppStorage(AppStorageKey.aiProvider) private var selectedAIProviderRaw = AIAssistant.Provider.chatGPT.rawValue
     @AppStorage(AppStorageKey.language) private var selectedLanguageRaw = AppLanguage.system.rawValue
@@ -96,7 +97,7 @@ struct AddFoodView: View {
             .pickerStyle(.segmented)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                ForEach(FoodPreset.presets(for: selectedCategory)) { preset in
+                ForEach(presetStore.presets(for: selectedCategory)) { preset in
                     PresetChip(
                         preset: preset,
                         theme: theme,
@@ -240,5 +241,6 @@ private struct PresetChip: View {
 #Preview {
     AddFoodView()
         .environment(HealthKitManager())
+        .environment(FoodPresetStore())
         .modelContainer(for: Product.self, inMemory: true)
 }
