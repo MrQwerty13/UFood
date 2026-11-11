@@ -53,7 +53,7 @@
       "name": "Products",
       "children": [
         { "path": "<PRODUCTS>/UFood.app", "id": "745A08AB30A3274F001E73B3", "type": "wrapper.application", "index": false },
-        { "path": "<PRODUCTS>/UFoodWidgetExtension.appex", "id": "745A08AD30A3274F001E73B3", "type": "wrapper.app-extension", "index": false },
+        { "path": "<PRODUCTS>/UFoodWidgetExtension.appex", "id": "745A08AD30A3274F001E73B3", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "UFood/copy/Embed App Extensions", "header-preservation": "remove-on-copy" } ] },
       ],
     },
   ],
@@ -67,7 +67,11 @@
         "compile-sources",
         "frameworks",
         "resources",
-        "embed-app-extensions",
+        {
+          "kind": "copy",
+          "name": "Embed App Extensions",
+          "bundle-base-path": "plugins-directory",
+        },
       ],
       "dependencies": [
         "745A08AC30A3274F001E73B3",
