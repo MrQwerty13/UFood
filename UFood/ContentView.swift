@@ -52,7 +52,7 @@ struct ContentView: View {
                     .accessibilityLabel("Add Food")
                 }
             }
-            .sheet(isPresented: $isAddingFood) {
+            .sheet(isPresented: $isAddingFood, onDismiss: refreshForCurrentDay) {
                 AddFoodView()
             }
         }
@@ -100,16 +100,26 @@ private struct TodayListView: View {
 
     private var dayTotalKcal: Double { CalorieMath.total(of: todaysProducts) }
 
+    private var energySummary: DailyEnergySummary {
+        DailyEnergySummary(
+            eatenKcal: dayTotalKcal,
+            activeBurnedKcal: healthKit.activeBurnedKcal,
+            basalBurnedKcal: healthKit.restingBurnedKcal,
+            healthAccessGranted: healthKit.isAuthorized,
+            healthDataAvailable: healthKit.isAvailable
+        )
+    }
+
     var body: some View {
         List {
             clearSection {
-                dayTotalCard
-            }
-
-            if healthKit.isAuthorized, let burned = healthKit.totalBurnedKcal {
-                clearSection {
-                    energyBalanceRow(burned: burned)
-                }
+                DailyEnergyDashboard(
+                    summary: energySummary,
+                    theme: theme,
+                    onEnableHealth: {
+                        Task { await healthKit.requestAuthorization() }
+                    }
+                )
             }
 
             Section {
@@ -131,40 +141,6 @@ private struct TodayListView: View {
         .scrollContentBackground(.hidden)
     }
 
-    private var dayTotalCard: some View {
-        VStack(spacing: 6) {
-            Text("Today")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(theme.onGradient.opacity(0.85))
-            Text(CalorieMath.formatted(dayTotalKcal))
-                .font(.system(size: 64, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(theme.onGradient)
-            Text("kcal gained")
-                .font(.title3.weight(.medium))
-                .foregroundStyle(theme.onGradient.opacity(0.9))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .background(theme.brandGradient, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: theme.primary.opacity(0.25), radius: 16, y: 8)
-    }
-
-    private func energyBalanceRow(burned: Double) -> some View {
-        let net = dayTotalKcal - burned
-        return HStack {
-            Label("Burned \(CalorieMath.formatted(burned))", systemImage: "flame.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(theme.accent)
-            Spacer()
-            Text(netLabel(net))
-                .font(.subheadline.weight(.bold).monospacedDigit())
-                .foregroundStyle(net >= 0 ? theme.primary : theme.end)
-        }
-        .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "leaf.fill")
@@ -181,15 +157,11 @@ private struct TodayListView: View {
         .padding(.vertical, 28)
     }
 
-    private func netLabel(_ net: Double) -> String {
-        let prefix = net > 0 ? "+" : ""
-        return "Net \(prefix)\(CalorieMath.formatted(net))"
-    }
-
     private func deleteProducts(offsets: IndexSet) {
         withAnimation {
             offsets.map { todaysProducts[$0] }.forEach(modelContext.delete)
         }
+        Task { await healthKit.refreshIfNeeded() }
     }
 
     @ViewBuilder
