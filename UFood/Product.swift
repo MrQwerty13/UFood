@@ -11,8 +11,8 @@ import SwiftData
 @Model
 final class Product {
     var name: String
-    var kkalsPer100g: Int
-    var eatenGramms: Int
+    var kkalsPer100g: Double
+    var eatenGramms: Double
     var tag: String?
     var timestamp: Date
 
@@ -20,14 +20,14 @@ final class Product {
         CalorieMath.kcal(per100g: kkalsPer100g, grams: eatenGramms)
     }
 
-    var roundedKcal: Int {
-        CalorieMath.roundedKcal(per100g: kkalsPer100g, grams: eatenGramms)
+    var formattedKcal: String {
+        CalorieMath.formatted(kcal)
     }
 
     init(
         name: String,
-        kkalsPer100g: Int,
-        eatenGramms: Int,
+        kkalsPer100g: Double,
+        eatenGramms: Double,
         tag: String? = nil,
         timestamp: Date = Date()
     ) {

@@ -23,9 +23,9 @@ struct FoodPreset: Identifiable, Hashable, Codable {
     }
 
     let id: String
-    let kkalsPer100g: Int
+    let kkalsPer100g: Double
     let category: Category
-    let defaultGrams: Int
+    let defaultGrams: Double
     let nameOverride: String?
 
     var name: String {
@@ -34,9 +34,9 @@ struct FoodPreset: Identifiable, Hashable, Codable {
 
     init(
         id: String,
-        kkalsPer100g: Int,
+        kkalsPer100g: Double,
         category: Category,
-        defaultGrams: Int,
+        defaultGrams: Double,
         nameOverride: String? = nil
     ) {
         self.id = id
@@ -97,8 +97,8 @@ final class FoodPresetStore {
 
     private struct PresetValues: Codable {
         let name: String
-        let kkalsPer100g: Int
-        let defaultGrams: Int
+        let kkalsPer100g: Double
+        let defaultGrams: Double
         let category: FoodPreset.Category
     }
 
@@ -160,8 +160,8 @@ final class FoodPresetStore {
     func update(
         _ preset: FoodPreset,
         name: String,
-        kkalsPer100g: Int,
-        defaultGrams: Int,
+        kkalsPer100g: Double,
+        defaultGrams: Double,
         category: FoodPreset.Category
     ) throws {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -191,9 +191,9 @@ final class FoodPresetStore {
 
     func add(
         name: String,
-        kkalsPer100g: Int,
+        kkalsPer100g: Double,
         category: FoodPreset.Category,
-        defaultGrams: Int
+        defaultGrams: Double
     ) throws {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty, kkalsPer100g > 0, defaultGrams > 0 else {

@@ -5,27 +5,20 @@
 //  Created by Михаил Позур on 10.11.2026.
 //
 
+import Combine
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(HealthKitManager.self) private var healthKit
-    @Query private var todaysProducts: [Product]
+    @Environment(DayTracker.self) private var dayTracker
     @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
     @AppStorage(AppStorageKey.displayName) private var displayName = ""
     @State private var isAddingFood = false
 
     private var theme: ColorPreset { .resolved(from: selectedPresetRaw) }
-    private var dayTotalKcal: Int { CalorieMath.totalRounded(of: todaysProducts) }
-
-    init() {
-        let startOfToday = Calendar.current.startOfDay(for: Date())
-        _todaysProducts = Query(
-            filter: #Predicate<Product> { $0.timestamp >= startOfToday },
-            sort: [SortDescriptor(\Product.timestamp, order: .reverse)]
-        )
-    }
 
     var body: some View {
         NavigationStack {
@@ -33,34 +26,8 @@ struct ContentView: View {
                 theme.softBackground
                     .ignoresSafeArea()
 
-                List {
-                    clearSection {
-                        dayTotalCard
-                    }
-
-                    if healthKit.isAuthorized, let burned = healthKit.totalBurnedKcal {
-                        clearSection {
-                            energyBalanceRow(burned: burned)
-                        }
-                    }
-
-                    Section {
-                        if todaysProducts.isEmpty {
-                            emptyState
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                        } else {
-                            ForEach(todaysProducts) { product in
-                                ProductRow(product: product, theme: theme)
-                            }
-                            .onDelete(perform: deleteProducts)
-                        }
-                    } header: {
-                        Text("Entries")
-                            .foregroundStyle(theme.secondary)
-                    }
-                }
-                .scrollContentBackground(.hidden)
+                TodayListView(dayStart: dayTracker.dayStart, theme: theme)
+                    .id(dayTracker.dayStart)
             }
             .navigationTitle(displayName.isEmpty ? "UFood" : displayName)
             .toolbar {
@@ -88,11 +55,80 @@ struct ContentView: View {
             .sheet(isPresented: $isAddingFood) {
                 AddFoodView()
             }
-            .task {
-                await healthKit.refreshIfNeeded()
-            }
         }
         .tint(theme.primary)
+        .task {
+            await healthKit.refreshIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            refreshForCurrentDay()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)
+        ) { _ in
+            refreshForCurrentDay()
+        }
+    }
+
+    private func refreshForCurrentDay() {
+        dayTracker.refreshIfNeeded()
+        Task {
+            await healthKit.refreshIfNeeded()
+        }
+    }
+}
+
+private struct TodayListView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(HealthKitManager.self) private var healthKit
+    @Query private var todaysProducts: [Product]
+
+    private let theme: ColorPreset
+
+    init(dayStart: Date, theme: ColorPreset) {
+        self.theme = theme
+        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)
+            ?? dayStart.addingTimeInterval(24 * 60 * 60)
+        _todaysProducts = Query(
+            filter: #Predicate<Product> {
+                $0.timestamp >= dayStart && $0.timestamp < dayEnd
+            },
+            sort: [SortDescriptor(\Product.timestamp, order: .reverse)]
+        )
+    }
+
+    private var dayTotalKcal: Double { CalorieMath.total(of: todaysProducts) }
+
+    var body: some View {
+        List {
+            clearSection {
+                dayTotalCard
+            }
+
+            if healthKit.isAuthorized, let burned = healthKit.totalBurnedKcal {
+                clearSection {
+                    energyBalanceRow(burned: burned)
+                }
+            }
+
+            Section {
+                if todaysProducts.isEmpty {
+                    emptyState
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                } else {
+                    ForEach(todaysProducts) { product in
+                        ProductRow(product: product, theme: theme)
+                    }
+                    .onDelete(perform: deleteProducts)
+                }
+            } header: {
+                Text("Entries")
+                    .foregroundStyle(theme.secondary)
+            }
+        }
+        .scrollContentBackground(.hidden)
     }
 
     private var dayTotalCard: some View {
@@ -100,7 +136,7 @@ struct ContentView: View {
             Text("Today")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(theme.onGradient.opacity(0.85))
-            Text("\(dayTotalKcal)")
+            Text(CalorieMath.formatted(dayTotalKcal))
                 .font(.system(size: 64, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(theme.onGradient)
@@ -114,10 +150,10 @@ struct ContentView: View {
         .shadow(color: theme.primary.opacity(0.25), radius: 16, y: 8)
     }
 
-    private func energyBalanceRow(burned: Int) -> some View {
+    private func energyBalanceRow(burned: Double) -> some View {
         let net = dayTotalKcal - burned
         return HStack {
-            Label("Burned \(burned)", systemImage: "flame.fill")
+            Label("Burned \(CalorieMath.formatted(burned))", systemImage: "flame.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(theme.accent)
             Spacer()
@@ -145,9 +181,9 @@ struct ContentView: View {
         .padding(.vertical, 28)
     }
 
-    private func netLabel(_ net: Int) -> String {
+    private func netLabel(_ net: Double) -> String {
         let prefix = net > 0 ? "+" : ""
-        return "Net \(prefix)\(net)"
+        return "Net \(prefix)\(CalorieMath.formatted(net))"
     }
 
     private func deleteProducts(offsets: IndexSet) {
@@ -185,14 +221,17 @@ private struct ProductRow: View {
                             .background(theme.brandGradient, in: Capsule())
                             .foregroundStyle(theme.onGradient)
                     }
-                    Text("\(product.eatenGramms) g · \(product.kkalsPer100g) kcal/100g")
+                    Text(
+                        "\(CalorieMath.formatted(product.eatenGramms)) g · "
+                            + "\(CalorieMath.formatted(product.kkalsPer100g)) kcal/100g"
+                    )
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer()
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("~\(product.roundedKcal)")
+                Text("~\(product.formattedKcal)")
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(theme.accent)
@@ -213,5 +252,6 @@ private struct ProductRow: View {
 
     return ContentView()
         .environment(HealthKitManager())
+        .environment(DayTracker())
         .modelContainer(container)
 }

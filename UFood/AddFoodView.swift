@@ -32,12 +32,12 @@ struct AddFoodView: View {
     private var aiProvider: AIAssistant.Provider { .resolved(from: selectedAIProviderRaw) }
     private var language: AppLanguage { .resolved(from: selectedLanguageRaw) }
 
-    private var kkalsPer100g: Int? {
-        Int(kkalsPer100gText.trimmingCharacters(in: .whitespacesAndNewlines))
+    private var kkalsPer100g: Double? {
+        CalorieMath.parseDecimal(kkalsPer100gText)
     }
 
-    private var eatenGramms: Int? {
-        Int(eatenGrammsText.trimmingCharacters(in: .whitespacesAndNewlines))
+    private var eatenGramms: Double? {
+        CalorieMath.parseDecimal(eatenGrammsText)
     }
 
     private var trimmedName: String {
@@ -48,9 +48,33 @@ struct AddFoodView: View {
         !trimmedName.isEmpty && (kkalsPer100g ?? 0) > 0 && (eatenGramms ?? 0) > 0
     }
 
-    private var previewKcal: Int? {
+    private var validationMessage: String? {
+        let kcalText = kkalsPer100gText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !kcalText.isEmpty {
+            guard let value = kkalsPer100g else {
+                return "Enter a valid number for kcal per 100g."
+            }
+            if value <= 0 {
+                return "Kcal per 100g must be greater than zero."
+            }
+        }
+
+        let gramsText = eatenGrammsText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !gramsText.isEmpty {
+            guard let value = eatenGramms else {
+                return "Enter a valid number for grams eaten."
+            }
+            if value <= 0 {
+                return "Grams eaten must be greater than zero."
+            }
+        }
+
+        return nil
+    }
+
+    private var previewKcal: Double? {
         guard let kkalsPer100g, let eatenGramms, isValid else { return nil }
-        return CalorieMath.roundedKcal(per100g: kkalsPer100g, grams: eatenGramms)
+        return CalorieMath.kcal(per100g: kkalsPer100g, grams: eatenGramms)
     }
 
     private var gramsPrompt: String {
@@ -126,10 +150,16 @@ struct AddFoodView: View {
                 .textInputAutocapitalization(.words)
 
             TextField("kcal per 100g", text: $kkalsPer100gText)
-                .keyboardType(.numberPad)
+                .keyboardType(.decimalPad)
 
             TextField("Grams eaten", text: $eatenGrammsText)
-                .keyboardType(.numberPad)
+                .keyboardType(.decimalPad)
+
+            if let validationMessage {
+                Text(validationMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
 
             Menu {
                 ForEach(AIAssistant.Provider.allCases) { provider in
@@ -179,12 +209,12 @@ struct AddFoodView: View {
         }
     }
 
-    private func previewSection(_ previewKcal: Int) -> some View {
+    private func previewSection(_ previewKcal: Double) -> some View {
         Section {
             HStack {
                 Text("This entry")
                 Spacer()
-                Text("~\(previewKcal) kcal")
+                Text("~\(CalorieMath.formatted(previewKcal)) kcal")
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(theme.accent)
             }
@@ -198,9 +228,9 @@ struct AddFoodView: View {
 
     private func applyPreset(_ preset: FoodPreset) {
         name = preset.name
-        kkalsPer100gText = String(preset.kkalsPer100g)
+        kkalsPer100gText = CalorieMath.formatted(preset.kkalsPer100g)
         if eatenGrammsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            eatenGrammsText = String(preset.defaultGrams)
+            eatenGrammsText = CalorieMath.formatted(preset.defaultGrams)
         }
     }
 
@@ -249,7 +279,7 @@ private struct PresetChip: View {
                 Text(preset.name)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(isSelected ? theme.onGradient : .primary)
-                Text("\(preset.kkalsPer100g) kcal/100g")
+                Text("\(CalorieMath.formatted(preset.kkalsPer100g)) kcal/100g")
                     .font(.caption)
                     .foregroundStyle(isSelected ? theme.onGradient.opacity(0.9) : .secondary)
             }

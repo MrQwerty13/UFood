@@ -26,14 +26,14 @@ enum AIAssistant {
     /// Prompt crafted so the model returns a clean gram estimate for the calorie tracker.
     static func gramsEstimatePrompt(
         foodName: String?,
-        kcalPer100g: Int?,
+        kcalPer100g: Double?,
         replyLanguage: String
     ) -> String {
         let food = foodName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let foodLine = (food?.isEmpty == false) ? food! : "unknown food (I will describe it)"
         let kcalLine: String = {
             if let kcalPer100g, kcalPer100g > 0 {
-                return "Label / known value: \(kcalPer100g) kcal per 100g (for context only)."
+                return "Label / known value: \(CalorieMath.formatted(kcalPer100g)) kcal per 100g (for context only)."
             }
             return "kcal per 100g: unknown."
         }()

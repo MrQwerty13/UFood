@@ -6,21 +6,38 @@
 import Foundation
 
 enum CalorieMath {
-    static func kcal(per100g: Int, grams: Int) -> Double {
-        Double(per100g) * Double(grams) / 100.0
+    static func kcal(per100g: Double, grams: Double) -> Double {
+        per100g * grams / 100.0
     }
 
-    static func roundedKcal(per100g: Int, grams: Int) -> Int {
-        Int(kcal(per100g: per100g, grams: grams).rounded())
+    static func total(of products: [Product]) -> Double {
+        products.reduce(0.0) { $0 + $1.kcal }
     }
 
-    static func totalRounded(of products: [Product]) -> Int {
-        Int(products.reduce(0.0) { $0 + $1.kcal }.rounded())
+    /// Parses user input using either a comma or a dot as the decimal separator.
+    static func parseDecimal(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let normalized = trimmed.replacingOccurrences(of: ",", with: ".")
+        guard normalized.filter({ $0 == "." }).count <= 1,
+              let value = Double(normalized),
+              value.isFinite
+        else { return nil }
+
+        return value
     }
 
-    static func signedKcal(_ value: Int) -> String {
+    /// Formats a value with up to one decimal place, omitting a trailing `.0`.
+    static func formatted(_ value: Double) -> String {
+        let rounded = (value * 10).rounded() / 10
+        let displayValue = rounded == 0 ? 0 : rounded
+        return displayValue.formatted(.number.precision(.fractionLength(0...1)))
+    }
+
+    static func signedKcal(_ value: Double) -> String {
         let prefix = value > 0 ? "+" : ""
-        return "\(prefix)\(value) kcal"
+        return "\(prefix)\(formatted(value)) kcal"
     }
 }
 

@@ -8,32 +8,22 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(HealthKitManager.self) private var healthKit
+    @Environment(DayTracker.self) private var dayTracker
     @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
     @AppStorage(AppStorageKey.aiProvider) private var selectedAIProviderRaw = AIAssistant.Provider
         .chatGPT.rawValue
     @AppStorage(AppStorageKey.language) private var selectedLanguageRaw = AppLanguage.system.rawValue
     @AppStorage(AppStorageKey.displayName) private var displayName = ""
-    @Query private var todaysProducts: [Product]
 
     private var theme: ColorPreset { .resolved(from: selectedPresetRaw) }
     private var aiProvider: AIAssistant.Provider { .resolved(from: selectedAIProviderRaw) }
     private var language: AppLanguage { .resolved(from: selectedLanguageRaw) }
-    private var gainedKcal: Int { CalorieMath.totalRounded(of: todaysProducts) }
-    private var burnedKcal: Int { healthKit.totalBurnedKcal ?? 0 }
-    private var netKcal: Int { gainedKcal - burnedKcal }
-
-    init() {
-        let startOfToday = Calendar.current.startOfDay(for: Date())
-        _todaysProducts = Query(
-            filter: #Predicate<Product> { $0.timestamp >= startOfToday },
-            sort: [SortDescriptor(\Product.timestamp, order: .reverse)]
-        )
-    }
 
     var body: some View {
         List {
             profileSection
-            energySection
+            TodayEnergySection(dayStart: dayTracker.dayStart, theme: theme)
+                .id(dayTracker.dayStart)
             foodPresetsSection
             themesSection
             aiProviderSection
@@ -75,44 +65,6 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    private var energySection: some View {
-        Section {
-            EnergyStatRow(
-                title: "Gained",
-                subtitle: "Food logged in UFood",
-                value: gainedKcal,
-                tint: theme.primary
-            )
-            EnergyStatRow(
-                title: "Burned",
-                subtitle: burnedSubtitle,
-                value: healthKit.isAuthorized ? burnedKcal : nil,
-                tint: theme.accent
-            )
-
-            if healthKit.isAuthorized {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Net")
-                            .font(.headline)
-                        Text(netSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(CalorieMath.signedKcal(netKcal))
-                        .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(netKcal >= 0 ? theme.primary : theme.end)
-                }
-                .padding(.vertical, 4)
-            }
-        } header: {
-            Text("Today’s Energy")
-        } footer: {
-            Text("Net = gained − burned. Positive means surplus, negative means deficit.")
         }
     }
 
@@ -206,9 +158,73 @@ struct SettingsView: View {
         }
     }
 
+}
+
+private struct TodayEnergySection: View {
+    @Environment(HealthKitManager.self) private var healthKit
+    @Query private var todaysProducts: [Product]
+
+    private let theme: ColorPreset
+
+    init(dayStart: Date, theme: ColorPreset) {
+        self.theme = theme
+        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)
+            ?? dayStart.addingTimeInterval(24 * 60 * 60)
+        _todaysProducts = Query(
+            filter: #Predicate<Product> {
+                $0.timestamp >= dayStart && $0.timestamp < dayEnd
+            },
+            sort: [SortDescriptor(\Product.timestamp, order: .reverse)]
+        )
+    }
+
+    private var gainedKcal: Double { CalorieMath.total(of: todaysProducts) }
+    private var burnedKcal: Double { healthKit.totalBurnedKcal ?? 0 }
+    private var netKcal: Double { gainedKcal - burnedKcal }
+
+    var body: some View {
+        Section {
+            EnergyStatRow(
+                title: "Gained",
+                subtitle: "Food logged in UFood",
+                value: gainedKcal,
+                tint: theme.primary
+            )
+            EnergyStatRow(
+                title: "Burned",
+                subtitle: burnedSubtitle,
+                value: healthKit.isAuthorized ? burnedKcal : nil,
+                tint: theme.accent
+            )
+
+            if healthKit.isAuthorized {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Net")
+                            .font(.headline)
+                        Text(netSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(CalorieMath.signedKcal(netKcal))
+                        .font(.title2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(netKcal >= 0 ? theme.primary : theme.end)
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Today’s Energy")
+        } footer: {
+            Text("Net = gained − burned. Positive means surplus, negative means deficit.")
+        }
+    }
+
     private var burnedSubtitle: String {
         guard healthKit.isAuthorized else { return "Connect Apple Health to load" }
-        return "Active \(healthKit.activeBurnedKcal ?? 0) · Resting \(healthKit.restingBurnedKcal ?? 0)"
+        let active = CalorieMath.formatted(healthKit.activeBurnedKcal ?? 0)
+        let resting = CalorieMath.formatted(healthKit.restingBurnedKcal ?? 0)
+        return "Active \(active) · Resting \(resting)"
     }
 
     private var netSubtitle: String {
@@ -257,7 +273,10 @@ private struct FoodPresetManagementView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(preset.name)
                                         .foregroundStyle(.primary)
-                                    Text("\(preset.kkalsPer100g) kcal/100g · \(preset.defaultGrams) g")
+                                    Text(
+                                        "\(CalorieMath.formatted(preset.kkalsPer100g)) kcal/100g · "
+                                            + "\(CalorieMath.formatted(preset.defaultGrams)) g"
+                                    )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -364,15 +383,27 @@ private struct FoodPresetEditorView: View {
     init(preset: FoodPreset?) {
         self.preset = preset
         _name = State(initialValue: preset?.name ?? "")
-        _kkalsPer100gText = State(initialValue: preset.map { String($0.kkalsPer100g) } ?? "")
-        _defaultGramsText = State(initialValue: preset.map { String($0.defaultGrams) } ?? "100")
+        _kkalsPer100gText = State(
+            initialValue: preset.map { CalorieMath.formatted($0.kkalsPer100g) } ?? ""
+        )
+        _defaultGramsText = State(
+            initialValue: preset.map { CalorieMath.formatted($0.defaultGrams) } ?? "100"
+        )
         _category = State(initialValue: preset?.category ?? .fruits)
+    }
+
+    private var kkalsPer100g: Double? {
+        CalorieMath.parseDecimal(kkalsPer100gText)
+    }
+
+    private var defaultGrams: Double? {
+        CalorieMath.parseDecimal(defaultGramsText)
     }
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (Int(kkalsPer100gText) ?? 0) > 0
-            && (Int(defaultGramsText) ?? 0) > 0
+            && (kkalsPer100g ?? 0) > 0
+            && (defaultGrams ?? 0) > 0
     }
 
     var body: some View {
@@ -380,9 +411,9 @@ private struct FoodPresetEditorView: View {
             TextField("Name", text: $name)
                 .textInputAutocapitalization(.words)
             TextField("kcal per 100g", text: $kkalsPer100gText)
-                .keyboardType(.numberPad)
+                .keyboardType(.decimalPad)
             TextField("Default grams", text: $defaultGramsText)
-                .keyboardType(.numberPad)
+                .keyboardType(.decimalPad)
             Picker("Category", selection: $category) {
                 ForEach(FoodPreset.Category.allCases) { category in
                     Text(category.title).tag(category)
@@ -415,9 +446,7 @@ private struct FoodPresetEditorView: View {
     }
 
     private func save() {
-        guard let kkalsPer100g = Int(kkalsPer100gText),
-            let defaultGrams = Int(defaultGramsText)
-        else { return }
+        guard let kkalsPer100g, let defaultGrams, isValid else { return }
 
         do {
             if let preset {
@@ -446,7 +475,7 @@ private struct FoodPresetEditorView: View {
 private struct EnergyStatRow: View {
     let title: String
     let subtitle: String
-    let value: Int?
+    let value: Double?
     let tint: Color
 
     var body: some View {
@@ -460,7 +489,7 @@ private struct EnergyStatRow: View {
             Spacer()
             Group {
                 if let value {
-                    Text("\(value) kcal")
+                    Text("\(CalorieMath.formatted(value)) kcal")
                         .foregroundStyle(tint)
                 } else {
                     Text("—")
@@ -479,5 +508,6 @@ private struct EnergyStatRow: View {
     }
     .environment(HealthKitManager())
     .environment(FoodPresetStore())
+    .environment(DayTracker())
     .modelContainer(for: Product.self, inMemory: true)
 }

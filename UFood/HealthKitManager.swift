@@ -13,8 +13,8 @@ final class HealthKitManager {
     var isAuthorized: Bool {
         didSet { UserDefaults.standard.set(isAuthorized, forKey: AppStorageKey.healthConnected) }
     }
-    var activeBurnedKcal: Int?
-    var restingBurnedKcal: Int?
+    var activeBurnedKcal: Double?
+    var restingBurnedKcal: Double?
     var statusMessage: String?
     var isLoading = false
     private var observerQueries: [HKObserverQuery] = []
@@ -28,7 +28,7 @@ final class HealthKitManager {
         HKHealthStore.isHealthDataAvailable()
     }
 
-    var totalBurnedKcal: Int? {
+    var totalBurnedKcal: Double? {
         guard isAuthorized else { return nil }
         guard activeBurnedKcal != nil || restingBurnedKcal != nil else { return nil }
         return (activeBurnedKcal ?? 0) + (restingBurnedKcal ?? 0)
@@ -80,10 +80,12 @@ final class HealthKitManager {
         defer { isLoading = false }
 
         do {
-            async let active = sumToday(for: .activeEnergyBurned)
-            async let resting = sumToday(for: .basalEnergyBurned)
-            activeBurnedKcal = Int((try await active).rounded())
-            restingBurnedKcal = Int((try await resting).rounded())
+            let now = Date()
+            let startOfDay = Calendar.current.startOfDay(for: now)
+            async let active = sumKcal(for: .activeEnergyBurned, from: startOfDay, to: now)
+            async let resting = sumKcal(for: .basalEnergyBurned, from: startOfDay, to: now)
+            activeBurnedKcal = try await active
+            restingBurnedKcal = try await resting
             statusMessage = nil
         } catch {
             statusMessage = error.localizedDescription
@@ -109,13 +111,16 @@ final class HealthKitManager {
         }
     }
 
-    private func sumToday(for identifier: HKQuantityTypeIdentifier) async throws -> Double {
+    private func sumKcal(
+        for identifier: HKQuantityTypeIdentifier,
+        from start: Date,
+        to end: Date
+    ) async throws -> Double {
         guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return 0 }
 
-        let start = Calendar.current.startOfDay(for: Date())
         let predicate = HKQuery.predicateForSamples(
             withStart: start,
-            end: Date(),
+            end: end,
             options: .strictStartDate
         )
         let descriptor = HKStatisticsQueryDescriptor(
