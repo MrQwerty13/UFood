@@ -46,7 +46,11 @@ struct DailyEnergyDashboard: View {
                         valueColor: .primary
                     ) {
                         Text(
-                            "Active \(summary.activeBurnedKcalRounded) · Resting \(summary.basalBurnedKcalRounded)"
+                            String(
+                                format: appString("Active %@ · Resting %@"),
+                                CalorieMath.formatted(Double(summary.activeBurnedKcalRounded)),
+                                CalorieMath.formatted(Double(summary.basalBurnedKcalRounded))
+                            )
                         )
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(.secondary)

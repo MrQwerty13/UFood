@@ -7,7 +7,7 @@ import Foundation
 
 /// Aggregated calorie numbers for one day.
 /// All derived values live here so views only render the result.
-struct DailyEnergySummary {
+struct DailyEnergySummary: Equatable {
     let eatenKcal: Double
     let activeBurnedKcal: Double
     let basalBurnedKcal: Double

@@ -8,9 +8,7 @@ import SwiftUI
 enum ColorPreset: String, CaseIterable, Identifiable {
     case oceanMint
     case orangePink
-    case blackWhite
-    case shalfeiMint
-    case redPink
+    case mintPink
 
     var id: String { rawValue }
 
@@ -31,12 +29,8 @@ enum ColorPreset: String, CaseIterable, Identifiable {
             ]
         case .orangePink:
             [0xFF7A00, 0xE67C63, 0xCE7A90, 0xB675B4, 0xA06CD6, 0x8B5CF6].map { Color(hex: $0) }
-        case .blackWhite:
-            [0x000000, 0x161616, 0x484848, 0x808080, 0xBEBEBE, 0xFFFFFF].map { Color(hex: $0) }
-        case .shalfeiMint:
-            [0x7D9170, 0x88A483, 0x93B896, 0x9FCCAA, 0xAAE0BE, 0xB5F5D3].map { Color(hex: $0) }
-        case .redPink:
-            [0xE01E37, 0xE94E59, 0xF16F79, 0xF78B99, 0xFCA7B9, 0xFFC1DA].map { Color(hex: $0) }
+        case .mintPink:
+            [0x176B64, 0x347D73, 0x507D7A, 0x80596F, 0x984E69, 0xB34F73].map { Color(hex: $0) }
         }
     }
 
@@ -46,10 +40,7 @@ enum ColorPreset: String, CaseIterable, Identifiable {
     var end: Color { colors[5] }
 
     var onGradient: Color {
-        switch self {
-        case .blackWhite, .shalfeiMint: .black
-        default: .white
-        }
+        .white
     }
 
     var brandGradient: LinearGradient {

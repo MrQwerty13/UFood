@@ -104,9 +104,15 @@ final class FoodPresetStore {
 
     private enum PresetError: LocalizedError {
         case invalidValues
+        case persistence
 
         var errorDescription: String? {
-            appString("Enter a name and positive kcal and gram values.")
+            switch self {
+            case .invalidValues:
+                appString("Enter a name and positive kcal and gram values.")
+            case .persistence:
+                appString("Could not save food presets.")
+            }
         }
     }
 
@@ -129,7 +135,7 @@ final class FoodPresetStore {
                 overrides = [:]
                 customPresets = []
                 deletedPresetIDs = []
-                errorMessage = error.localizedDescription
+                errorMessage = appString("Could not load food presets.")
                 Logger(subsystem: Bundle.main.bundleIdentifier ?? "UFood", category: "presets")
                     .error("Could not load food presets: \(error.localizedDescription, privacy: .public)")
             }
@@ -252,8 +258,10 @@ final class FoodPresetStore {
             deletedPresetIDs = configuration.deletedPresetIDs
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
-            throw error
+            Logger(subsystem: Bundle.main.bundleIdentifier ?? "UFood", category: "presets")
+                .error("Could not save food presets: \(error.localizedDescription, privacy: .public)")
+            errorMessage = appString("Could not save food presets.")
+            throw PresetError.persistence
         }
     }
 }

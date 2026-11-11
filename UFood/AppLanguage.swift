@@ -9,8 +9,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case system
     case english
     case russian
-    case spanish
-    case german
 
     var id: String { rawValue }
 
@@ -19,8 +17,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .system: "language.system"
         case .english: "language.english"
         case .russian: "language.russian"
-        case .spanish: "language.spanish"
-        case .german: "language.german"
         }
     }
 
@@ -28,26 +24,26 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         appString(titleKey)
     }
 
-    /// Locale used for in-app strings. `nil` follows the system language.
-    var locale: Locale? {
-        switch self {
-        case .system: nil
+    var locale: Locale {
+        switch resolvedLanguage {
         case .english: Locale(identifier: "en")
         case .russian: Locale(identifier: "ru")
-        case .spanish: Locale(identifier: "es")
-        case .german: Locale(identifier: "de")
+        case .system: Locale(identifier: "en")
         }
     }
 
     var promptLanguageName: String {
-        switch self {
-        case .system:
-            Locale.current.localizedString(forLanguageCode: Locale.current.language.languageCode?.identifier ?? "en") ?? "English"
+        switch resolvedLanguage {
+        case .system: "English"
         case .english: "English"
         case .russian: "Russian"
-        case .spanish: "Spanish"
-        case .german: "German"
         }
+    }
+
+    private var resolvedLanguage: AppLanguage {
+        guard self == .system else { return self }
+        let preferredLanguage = Locale.preferredLanguages.first ?? "en"
+        return preferredLanguage.hasPrefix("ru") ? .russian : .english
     }
 
     static func resolved(from rawValue: String) -> AppLanguage {
@@ -56,13 +52,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 }
 
 /// Looks up a localized string using the language selected in Settings
-/// (falls back to the system language when `.system` is selected).
+/// (uses the device language when `.system` is selected).
 func appString(_ key: String) -> String {
     let raw = UserDefaults.standard.string(forKey: AppStorageKey.language) ?? AppLanguage.system.rawValue
     let language = AppLanguage.resolved(from: raw)
 
-    guard let code = language.locale?.identifier,
-          let path = Bundle.main.path(forResource: code, ofType: "lproj"),
+    guard let path = Bundle.main.path(forResource: language.locale.identifier, ofType: "lproj"),
           let bundle = Bundle(path: path)
     else {
         return NSLocalizedString(key, comment: "")

@@ -32,12 +32,17 @@ enum CalorieMath {
     static func formatted(_ value: Double) -> String {
         let rounded = (value * 10).rounded() / 10
         let displayValue = rounded == 0 ? 0 : rounded
-        return displayValue.formatted(.number.precision(.fractionLength(0...1)))
+        let language = AppLanguage.resolved(
+            from: UserDefaults.standard.string(forKey: AppStorageKey.language) ?? AppLanguage.system.rawValue
+        )
+        return displayValue.formatted(
+            .number.locale(language.locale).precision(.fractionLength(0...1))
+        )
     }
 
-    static func signedKcal(_ value: Double) -> String {
+    static func signed(_ value: Double) -> String {
         let prefix = value > 0 ? "+" : ""
-        return "\(prefix)\(formatted(value)) kcal"
+        return "\(prefix)\(formatted(value))"
     }
 }
 

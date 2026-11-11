@@ -1,0 +1,60 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "—" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "—" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "—" } }
+      }
+    },
+    "Balance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Balance" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Баланс" } }
+      }
+    },
+    "Burned" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Burned" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Сожжено" } }
+      }
+    },
+    "Calorie balance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Calorie balance" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Баланс калорий" } }
+      }
+    },
+    "Eaten" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Eaten" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Съедено" } }
+      }
+    },
+    "kcal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "kcal" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ккал" } }
+      }
+    },
+    "No data" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No data" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Нет данных" } }
+      }
+    },
+    "No data yet" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No data yet" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Пока нет данных" } }
+      }
+    },
+    "Today's eaten and burned calories with your net balance." : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Today's eaten and burned calories with your net balance." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Съеденные и сожжённые за сегодня калории и их разница." } }
+      }
+    }
+  },
+  "version" : "1.1"
+}

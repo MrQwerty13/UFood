@@ -1,0 +1,38 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSHealthShareUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UFood reads calories burned from Apple Health so you can compare them with food you logged."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UFood считывает данные о сожжённых калориях из Apple Health, чтобы сравнить их с записанной едой."
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UFood saves dietary energy from meals you log to Apple Health."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UFood сохраняет данные о пищевой энергии записанных блюд в Apple Health."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}

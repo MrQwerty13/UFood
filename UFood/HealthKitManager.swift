@@ -5,11 +5,13 @@
 
 import Foundation
 import HealthKit
+import os
 
 @MainActor
 @Observable
 final class HealthKitManager {
     private let store = HKHealthStore()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "UFood", category: "health")
     var isAuthorized: Bool {
         didSet { UserDefaults.standard.set(isAuthorized, forKey: AppStorageKey.healthConnected) }
     }
@@ -49,7 +51,7 @@ final class HealthKitManager {
 
     func requestAuthorization() async {
         guard isAvailable else {
-            statusMessage = "Apple Health is not available on this device."
+            statusMessage = appString("Apple Health is not available on this device.")
             return
         }
 
@@ -63,7 +65,8 @@ final class HealthKitManager {
             startObservingHealthData()
             await refreshToday()
         } catch {
-            statusMessage = error.localizedDescription
+            logger.error("Could not connect to Apple Health: \(error.localizedDescription, privacy: .public)")
+            statusMessage = appString("Could not connect to Apple Health.")
         }
     }
 
@@ -88,7 +91,8 @@ final class HealthKitManager {
             restingBurnedKcal = try await resting
             statusMessage = nil
         } catch {
-            statusMessage = error.localizedDescription
+            logger.error("Could not load Apple Health data: \(error.localizedDescription, privacy: .public)")
+            statusMessage = appString("Could not load Apple Health data.")
         }
     }
 
@@ -107,7 +111,8 @@ final class HealthKitManager {
         do {
             try await store.save(sample)
         } catch {
-            statusMessage = error.localizedDescription
+            logger.error("Could not save food calories to Apple Health: \(error.localizedDescription, privacy: .public)")
+            statusMessage = appString("Could not save food calories to Apple Health.")
         }
     }
 
@@ -142,7 +147,8 @@ final class HealthKitManager {
             let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completion, error in
                 Task { @MainActor [weak self] in
                     if let error {
-                        self?.statusMessage = error.localizedDescription
+                        self?.logger.error("Could not update Apple Health data: \(error.localizedDescription, privacy: .public)")
+                        self?.statusMessage = appString("Could not update Apple Health data.")
                     } else {
                         await self?.refreshToday()
                     }
@@ -155,8 +161,10 @@ final class HealthKitManager {
             store.enableBackgroundDelivery(for: type, frequency: .hourly) { [weak self] success, error in
                 guard !success || error != nil else { return }
                 Task { @MainActor [weak self] in
-                    self?.statusMessage = error?.localizedDescription
-                        ?? "Could not enable hourly Apple Health updates."
+                    if let error {
+                        self?.logger.error("Could not enable hourly Apple Health updates: \(error.localizedDescription, privacy: .public)")
+                    }
+                    self?.statusMessage = appString("Could not enable hourly Apple Health updates.")
                 }
             }
         }

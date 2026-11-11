@@ -85,9 +85,11 @@ private struct TodayListView: View {
     @Query private var todaysProducts: [Product]
 
     private let theme: ColorPreset
+    private let dayStart: Date
 
     init(dayStart: Date, theme: ColorPreset) {
         self.theme = theme
+        self.dayStart = dayStart
         let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)
             ?? dayStart.addingTimeInterval(24 * 60 * 60)
         _todaysProducts = Query(
@@ -139,6 +141,29 @@ private struct TodayListView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .onAppear(perform: syncWidgetData)
+        .onChange(of: energySummary) { _, _ in
+            syncWidgetData()
+        }
+        .onChange(of: theme) { _, _ in
+            syncWidgetData()
+        }
+    }
+
+    private func syncWidgetData() {
+        let burnedKcal = energySummary.healthAccessGranted
+            && energySummary.healthDataAvailable
+            && energySummary.hasBurnedData
+            ? energySummary.burnedKcal
+            : nil
+        WidgetEnergyDataStore.save(
+            WidgetEnergyData(
+                dayStart: dayStart,
+                eatenKcal: energySummary.eatenKcal,
+                burnedKcal: burnedKcal,
+                themeID: theme.rawValue,
+            )
+        )
     }
 
     private var emptyState: some View {

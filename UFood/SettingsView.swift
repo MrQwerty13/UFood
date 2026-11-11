@@ -207,9 +207,14 @@ private struct TodayEnergySection: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(CalorieMath.signedKcal(netKcal))
-                        .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(netKcal >= 0 ? theme.primary : theme.end)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(CalorieMath.signed(netKcal))
+                            .font(.title2.weight(.bold).monospacedDigit())
+                            .foregroundStyle(netKcal >= 0 ? theme.primary : theme.end)
+                        Text("kcal")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.vertical, 4)
             }
@@ -224,7 +229,7 @@ private struct TodayEnergySection: View {
         guard healthKit.isAuthorized else { return "Connect Apple Health to load" }
         let active = CalorieMath.formatted(healthKit.activeBurnedKcal ?? 0)
         let resting = CalorieMath.formatted(healthKit.restingBurnedKcal ?? 0)
-        return "Active \(active) · Resting \(resting)"
+        return String(format: appString("Active %@ · Resting %@"), active, resting)
     }
 
     private var netSubtitle: String {

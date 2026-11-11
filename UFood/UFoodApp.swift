@@ -39,7 +39,7 @@ struct UFoodApp: App {
                 .environment(foodPresetStore)
                 .environment(foodTagStore)
                 .environment(dayTracker)
-                .environment(\.locale, language.locale ?? Locale.current)
+                .environment(\.locale, language.locale)
         }
         .modelContainer(sharedModelContainer)
     }

@@ -30,17 +30,42 @@ enum AIAssistant {
         replyLanguage: String
     ) -> String {
         let food = foodName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let foodLine = (food?.isEmpty == false) ? food! : "unknown food (I will describe it)"
+        let isRussian = replyLanguage == "Russian"
+        let foodLine = (food?.isEmpty == false)
+            ? food!
+            : (isRussian ? "неизвестный продукт (я опишу его)" : "unknown food (I will describe it)")
         let kcalLine: String = {
             if let kcalPer100g, kcalPer100g > 0 {
-                return "Label / known value: \(CalorieMath.formatted(kcalPer100g)) kcal per 100g (for context only)."
+                if isRussian {
+                    return "Известная калорийность: \(CalorieMath.formatted(kcalPer100g)) ккал на 100 г (только для ориентира)."
+                }
+                return "Known value: \(CalorieMath.formatted(kcalPer100g)) kcal per 100g (for context only)."
             }
-            return "kcal per 100g: unknown."
+            return isRussian ? "Калорийность на 100 г неизвестна." : "Calories per 100g: unknown."
         }()
+
+        if isRussian {
+            return """
+            Я записываю еду в дневник калорий и хочу оценить, сколько граммов съел(а).
+            Отвечай по-русски.
+
+            Продукт: \(foodLine)
+            \(kcalLine)
+
+            Инструкции:
+            1. Задай несколько коротких уточняющих вопросов о размере порции (ладонь, чашка, размер тарелки, упаковка или сравнение с обычными предметами).
+            2. После моих ответов назови одну наиболее вероятную оценку в граммах.
+            3. Также укажи реалистичный диапазон от минимума до максимума в граммах.
+            4. Заверши ответ ровно этой строкой, чтобы я мог(ла) скопировать её в приложение:
+            Примерный вес в граммах: <число>
+
+            В конце ответь кратко. Не пересчитывай вес в калории, если я не попрошу.
+            """
+        }
 
         return """
         I am logging food in a calorie tracker and need an estimate of how many grams I ate.
-        Please reply in \(replyLanguage).
+        Reply in English.
 
         Food: \(foodLine)
         \(kcalLine)
