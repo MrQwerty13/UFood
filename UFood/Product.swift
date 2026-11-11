@@ -13,6 +13,7 @@ final class Product {
     var name: String
     var kkalsPer100g: Int
     var eatenGramms: Int
+    var tag: String?
     var timestamp: Date
 
     var kcal: Double {
@@ -23,10 +24,17 @@ final class Product {
         CalorieMath.roundedKcal(per100g: kkalsPer100g, grams: eatenGramms)
     }
 
-    init(name: String, kkalsPer100g: Int, eatenGramms: Int, timestamp: Date = Date()) {
+    init(
+        name: String,
+        kkalsPer100g: Int,
+        eatenGramms: Int,
+        tag: String? = nil,
+        timestamp: Date = Date()
+    ) {
         self.name = name
         self.kkalsPer100g = kkalsPer100g
         self.eatenGramms = eatenGramms
+        self.tag = tag
         self.timestamp = timestamp
     }
 }

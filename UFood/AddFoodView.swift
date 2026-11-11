@@ -14,6 +14,7 @@ struct AddFoodView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(FoodPresetStore.self) private var presetStore
+    @Environment(FoodTagStore.self) private var foodTagStore
     @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
     @AppStorage(AppStorageKey.aiProvider) private var selectedAIProviderRaw = AIAssistant.Provider.chatGPT.rawValue
     @AppStorage(AppStorageKey.language) private var selectedLanguageRaw = AppLanguage.system.rawValue
@@ -22,6 +23,9 @@ struct AddFoodView: View {
     @State private var kkalsPer100gText = ""
     @State private var eatenGrammsText = ""
     @State private var selectedCategory: FoodPreset.Category = .fruits
+    @State private var selectedTag = "fruits"
+    @State private var newTagName = ""
+    @State private var tagErrorMessage: String?
     @State private var didCopyPrompt = false
 
     private var theme: ColorPreset { .resolved(from: selectedPresetRaw) }
@@ -61,6 +65,7 @@ struct AddFoodView: View {
         NavigationStack {
             Form {
                 presetsSection
+                tagSection
                 customSection
                 if let previewKcal {
                     previewSection(previewKcal)
@@ -151,6 +156,29 @@ struct AddFoodView: View {
         }
     }
 
+    private var tagSection: some View {
+        Section("Tag") {
+            Picker("Tag", selection: $selectedTag) {
+                ForEach(foodTagStore.tags) { tag in
+                    Text(tag.title).tag(tag.id)
+                }
+            }
+
+            HStack {
+                TextField("New tag", text: $newTagName)
+                    .textInputAutocapitalization(.words)
+                Button("Add tag", systemImage: "plus", action: addTag)
+                    .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            if let tagErrorMessage {
+                Text(tagErrorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
     private func previewSection(_ previewKcal: Int) -> some View {
         Section {
             HStack {
@@ -176,6 +204,17 @@ struct AddFoodView: View {
         }
     }
 
+    private func addTag() {
+        do {
+            try foodTagStore.add(newTagName)
+            selectedTag = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+            newTagName = ""
+            tagErrorMessage = nil
+        } catch {
+            tagErrorMessage = error.localizedDescription
+        }
+    }
+
     private func openAI(_ provider: AIAssistant.Provider) {
         selectedAIProviderRaw = provider.rawValue
         AIAssistant.open(provider, prompt: gramsPrompt)
@@ -187,7 +226,8 @@ struct AddFoodView: View {
         let product = Product(
             name: trimmedName,
             kkalsPer100g: kkalsPer100g,
-            eatenGramms: eatenGramms
+            eatenGramms: eatenGramms,
+            tag: selectedTag
         )
         modelContext.insert(product)
         Task {

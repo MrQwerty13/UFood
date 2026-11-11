@@ -13,6 +13,7 @@ import Foundation
 struct UFoodApp: App {
     @State private var healthKitManager = HealthKitManager()
     @State private var foodPresetStore = FoodPresetStore()
+    @State private var foodTagStore = FoodTagStore()
     @AppStorage(AppStorageKey.language) private var selectedLanguageRaw = AppLanguage.system.rawValue
 
     private var language: AppLanguage { .resolved(from: selectedLanguageRaw) }
@@ -35,6 +36,7 @@ struct UFoodApp: App {
             ContentView()
                 .environment(healthKitManager)
                 .environment(foodPresetStore)
+                .environment(foodTagStore)
                 .environment(\.locale, language.locale ?? Locale.current)
         }
         .modelContainer(sharedModelContainer)

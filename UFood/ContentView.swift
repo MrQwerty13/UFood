@@ -176,9 +176,19 @@ private struct ProductRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(product.name)
                     .font(.headline)
-                Text("\(product.eatenGramms) g · \(product.kkalsPer100g) kcal/100g")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    if let tag = product.tag {
+                        Text(FoodTag.title(for: tag))
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(theme.brandGradient, in: Capsule())
+                            .foregroundStyle(theme.onGradient)
+                    }
+                    Text("\(product.eatenGramms) g · \(product.kkalsPer100g) kcal/100g")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             HStack(alignment: .firstTextBaseline, spacing: 4) {

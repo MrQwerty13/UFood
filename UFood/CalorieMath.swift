@@ -31,4 +31,5 @@ enum AppStorageKey {
     static let aiProvider = "preferredAIProvider"
     static let language = "appLanguage"
     static let foodPresets = "foodPresets"
+    static let foodTags = "foodTags"
 }
