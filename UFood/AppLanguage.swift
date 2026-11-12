@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum AppLanguage: String, CaseIterable, Identifiable {
+nonisolated enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     case system
     case english
     case russian
@@ -53,7 +53,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
 /// Looks up a localized string using the language selected in Settings
 /// (uses the device language when `.system` is selected).
-func appString(_ key: String) -> String {
+nonisolated func appString(_ key: String) -> String {
     let raw = UserDefaults.standard.string(forKey: AppStorageKey.language) ?? AppLanguage.system.rawValue
     let language = AppLanguage.resolved(from: raw)
 

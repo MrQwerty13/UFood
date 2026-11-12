@@ -12,6 +12,7 @@ import os
 final class HealthKitManager {
     private let store = HKHealthStore()
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "UFood", category: "health")
+    private let burnedCache: BurnedEnergyCache
     var isAuthorized: Bool {
         didSet { UserDefaults.standard.set(isAuthorized, forKey: AppStorageKey.healthConnected) }
     }
@@ -22,7 +23,8 @@ final class HealthKitManager {
     private var observerQueries: [HKObserverQuery] = []
     private var isObservingHealthData = false
 
-    init() {
+    init(burnedCache: BurnedEnergyCache? = nil) {
+        self.burnedCache = burnedCache ?? BurnedEnergyCache.shared
         isAuthorized = UserDefaults.standard.bool(forKey: AppStorageKey.healthConnected)
     }
 
@@ -96,6 +98,131 @@ final class HealthKitManager {
         }
     }
 
+    /// Returns cached or freshly queried active/basal energy for a completed day.
+    /// `nil` means Apple Health had no samples for that day.
+    func burnedEnergy(forDayStarting dayStart: Date, forceRefresh: Bool = false) async -> BurnedDayEnergy? {
+        guard isAvailable, isAuthorized else { return nil }
+
+        let normalizedStart = Calendar.current.startOfDay(for: dayStart)
+        if !forceRefresh, let cached = burnedCache.energy(for: normalizedStart) {
+            return cached
+        }
+
+        guard let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: normalizedStart) else {
+            return nil
+        }
+
+        do {
+            async let active = sumKcalOptional(for: .activeEnergyBurned, from: normalizedStart, to: dayEnd)
+            async let basal = sumKcalOptional(for: .basalEnergyBurned, from: normalizedStart, to: dayEnd)
+            let activeValue = try await active
+            let basalValue = try await basal
+
+            guard activeValue != nil || basalValue != nil else { return nil }
+
+            let energy = BurnedDayEnergy(
+                dayStart: normalizedStart,
+                activeBurnedKcal: activeValue ?? 0,
+                basalBurnedKcal: basalValue ?? 0
+            )
+            burnedCache.store(energy)
+            return energy
+        } catch {
+            logger.error(
+                "Could not load Apple Health data for day: \(error.localizedDescription, privacy: .public)"
+            )
+            return burnedCache.energy(for: normalizedStart)
+        }
+    }
+
+    /// Prefetches burned energy for many completed days, using cache when possible.
+    func preloadBurnedEnergy(forDayStarts dayStarts: [Date]) async -> [Date: BurnedDayEnergy] {
+        var result: [Date: BurnedDayEnergy] = [:]
+        guard isAvailable, isAuthorized else { return result }
+
+        let uniqueStarts = Array(
+            Set(dayStarts.map { Calendar.current.startOfDay(for: $0) })
+        ).sorted(by: >)
+
+        var missing: [Date] = []
+        for dayStart in uniqueStarts {
+            if let cached = burnedCache.energy(for: dayStart) {
+                result[dayStart] = cached
+            } else {
+                missing.append(dayStart)
+            }
+        }
+
+        guard let firstMissing = missing.last, let lastMissing = missing.first else {
+            return result
+        }
+        guard let rangeEnd = Calendar.current.date(byAdding: .day, value: 1, to: lastMissing) else {
+            return result
+        }
+
+        do {
+            async let activeByDay = dailySums(for: .activeEnergyBurned, from: firstMissing, to: rangeEnd)
+            async let basalByDay = dailySums(for: .basalEnergyBurned, from: firstMissing, to: rangeEnd)
+            let activeMap = try await activeByDay
+            let basalMap = try await basalByDay
+
+            for dayStart in missing {
+                let active = activeMap[dayStart]
+                let basal = basalMap[dayStart]
+                guard active != nil || basal != nil else { continue }
+                let energy = BurnedDayEnergy(
+                    dayStart: dayStart,
+                    activeBurnedKcal: active ?? 0,
+                    basalBurnedKcal: basal ?? 0
+                )
+                burnedCache.store(energy)
+                result[dayStart] = energy
+            }
+        } catch {
+            logger.error(
+                "Could not preload Apple Health history: \(error.localizedDescription, privacy: .public)"
+            )
+            for dayStart in missing {
+                if let energy = await burnedEnergy(forDayStarting: dayStart) {
+                    result[dayStart] = energy
+                }
+            }
+        }
+
+        return result
+    }
+
+    private func dailySums(
+        for identifier: HKQuantityTypeIdentifier,
+        from start: Date,
+        to end: Date
+    ) async throws -> [Date: Double] {
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return [:] }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: start,
+            end: end,
+            options: .strictStartDate
+        )
+        let anchor = start
+        let interval = DateComponents(day: 1)
+        let query = HKStatisticsCollectionQueryDescriptor(
+            predicate: HKSamplePredicate<HKQuantitySample>.quantitySample(type: type, predicate: predicate),
+            options: .cumulativeSum,
+            anchorDate: anchor,
+            intervalComponents: interval
+        )
+
+        let collection = try await query.result(for: store)
+        var values: [Date: Double] = [:]
+        collection.enumerateStatistics(from: start, to: end) { stats, _ in
+            if let sum = stats.sumQuantity()?.doubleValue(for: .kilocalorie()) {
+                values[Calendar.current.startOfDay(for: stats.startDate)] = sum
+            }
+        }
+        return values
+    }
+
     func saveDietaryEnergy(kcal: Double, at date: Date = Date()) async {
         guard isAvailable, isAuthorized, kcal > 0,
               let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed)
@@ -121,7 +248,15 @@ final class HealthKitManager {
         from start: Date,
         to end: Date
     ) async throws -> Double {
-        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return 0 }
+        try await sumKcalOptional(for: identifier, from: start, to: end) ?? 0
+    }
+
+    private func sumKcalOptional(
+        for identifier: HKQuantityTypeIdentifier,
+        from start: Date,
+        to end: Date
+    ) async throws -> Double? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return nil }
 
         let predicate = HKQuery.predicateForSamples(
             withStart: start,
@@ -134,7 +269,7 @@ final class HealthKitManager {
         )
         return try await descriptor.result(for: store)?
             .sumQuantity()?
-            .doubleValue(for: .kilocalorie()) ?? 0
+            .doubleValue(for: .kilocalorie())
     }
 
     private func startObservingHealthData() {

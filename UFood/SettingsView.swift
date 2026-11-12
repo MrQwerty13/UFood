@@ -30,6 +30,7 @@ struct SettingsView: View {
             languageSection
         }
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
         .tint(theme.primary)
         .task { await healthKit.refreshIfNeeded() }
         .refreshable { await healthKit.refreshToday() }
@@ -89,7 +90,13 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .contentShape(Rectangle())
+                    .frame(minHeight: AppCardStyle.minTapSize)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(preset.title)
+                .accessibilityValue(theme == preset ? appString("Selected") : "")
+                .accessibilityAddTraits(theme == preset ? [.isSelected] : [])
             }
         }
     }
@@ -126,7 +133,13 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .contentShape(Rectangle())
+                    .frame(minHeight: AppCardStyle.minTapSize)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(provider.title)
+                .accessibilityValue(aiProvider == provider ? appString("Selected") : "")
+                .accessibilityAddTraits(aiProvider == provider ? [.isSelected] : [])
             }
         }
     }
@@ -153,7 +166,13 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .contentShape(Rectangle())
+                    .frame(minHeight: AppCardStyle.minTapSize)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(lang.title)
+                .accessibilityValue(language == lang ? appString("Selected") : "")
+                .accessibilityAddTraits(language == lang ? [.isSelected] : [])
             }
         }
     }
@@ -311,6 +330,7 @@ private struct FoodPresetManagementView: View {
             }
         }
         .navigationTitle("Food Presets")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
@@ -411,17 +431,72 @@ private struct FoodPresetEditorView: View {
             && (defaultGrams ?? 0) > 0
     }
 
+    private var validationMessage: String? {
+        let kcalText = kkalsPer100gText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !kcalText.isEmpty {
+            guard let value = kkalsPer100g else {
+                return String(localized: "Enter a valid number for kcal per 100g.")
+            }
+            if value <= 0 {
+                return String(localized: "Kcal per 100g must be greater than zero.")
+            }
+        }
+
+        let gramsText = defaultGramsText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !gramsText.isEmpty {
+            guard let value = defaultGrams else {
+                return String(localized: "Enter a valid number for grams eaten.")
+            }
+            if value <= 0 {
+                return String(localized: "Grams eaten must be greater than zero.")
+            }
+        }
+
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !kcalText.isEmpty || !gramsText.isEmpty {
+            return String(localized: "Enter a product name.")
+        }
+
+        return nil
+    }
+
     var body: some View {
         Form {
-            TextField("Name", text: $name)
-                .textInputAutocapitalization(.words)
-            TextField("kcal per 100g", text: $kkalsPer100gText)
-                .keyboardType(.decimalPad)
-            TextField("Default grams", text: $defaultGramsText)
-                .keyboardType(.decimalPad)
-            Picker("Category", selection: $category) {
-                ForEach(FoodPreset.Category.allCases) { category in
-                    Text(category.title).tag(category)
+            Section {
+                LabeledContent("Name") {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.words)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                LabeledContent("kcal per 100g") {
+                    TextField("0", text: $kkalsPer100gText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                LabeledContent("Default grams") {
+                    TextField("0", text: $defaultGramsText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                if let validationMessage {
+                    Text(validationMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Preset")
+            } footer: {
+                Text("Use a comma or a dot for decimals.")
+            }
+
+            Section("Category") {
+                Picker("Category", selection: $category) {
+                    ForEach(FoodPreset.Category.allCases) { category in
+                        Text(category.title).tag(category)
+                    }
                 }
             }
         }
@@ -430,11 +505,13 @@ private struct FoodPresetEditorView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
+                    .frame(minHeight: AppCardStyle.minTapSize)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save", action: save)
                     .fontWeight(.semibold)
                     .disabled(!isValid)
+                    .frame(minHeight: AppCardStyle.minTapSize)
             }
         }
         .alert(

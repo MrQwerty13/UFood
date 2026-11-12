@@ -6,8 +6,8 @@
 //
 
 import Combine
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 struct ContentView: View {
@@ -15,46 +15,20 @@ struct ContentView: View {
     @Environment(HealthKitManager.self) private var healthKit
     @Environment(DayTracker.self) private var dayTracker
     @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
-    @AppStorage(AppStorageKey.displayName) private var displayName = ""
-    @State private var isAddingFood = false
 
     private var theme: ColorPreset { .resolved(from: selectedPresetRaw) }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                theme.softBackground
-                    .ignoresSafeArea()
+        TabView {
+            HistoryView()
+                .tabItem {
+                    Label("History", systemImage: "calendar")
+                }
 
-                TodayListView(dayStart: dayTracker.dayStart, theme: theme)
-                    .id(dayTracker.dayStart)
-            }
-            .navigationTitle(displayName.isEmpty ? "UFood" : displayName)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundStyle(theme.brandGradient)
-                    }
-                    .accessibilityLabel("Settings")
+            TodayRootView()
+                .tabItem {
+                    Label("Today", systemImage: "sun.max.fill")
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isAddingFood = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(theme.onGradient, theme.brandGradient)
-                            .font(.title2)
-                    }
-                    .accessibilityLabel("Add Food")
-                }
-            }
-            .sheet(isPresented: $isAddingFood, onDismiss: refreshForCurrentDay) {
-                AddFoodView()
-            }
         }
         .tint(theme.primary)
         .task {
@@ -79,10 +53,78 @@ struct ContentView: View {
     }
 }
 
+private struct TodayRootView: View {
+    @Environment(HealthKitManager.self) private var healthKit
+    @Environment(DayTracker.self) private var dayTracker
+    @AppStorage(AppStorageKey.theme) private var selectedPresetRaw = ColorPreset.oceanMint.rawValue
+    @AppStorage(AppStorageKey.displayName) private var displayName = ""
+    @State private var isAddingFood = false
+    @State private var saveTrigger = 0
+
+    private var theme: ColorPreset { .resolved(from: selectedPresetRaw) }
+
+    /// The title is localized, while a custom user name is shown as is.
+    private var screenTitle: LocalizedStringKey {
+        displayName.isEmpty ? "Today" : LocalizedStringKey(displayName)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppSurfaceBackground(theme: theme)
+
+                TodayListView(dayStart: dayTracker.dayStart, theme: theme)
+                    .id(dayTracker.dayStart)
+            }
+            .navigationTitle(screenTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundStyle(theme.brandGradient)
+                            .frame(minWidth: AppCardStyle.minTapSize, minHeight: AppCardStyle.minTapSize)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Settings")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isAddingFood = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(theme.onGradient, theme.brandGradient)
+                            .font(.title2)
+                            .frame(minWidth: AppCardStyle.minTapSize, minHeight: AppCardStyle.minTapSize)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Add Food")
+                }
+            }
+            .sheet(isPresented: $isAddingFood, onDismiss: refreshForCurrentDay) {
+                AddFoodView(onSaved: { saveTrigger += 1 })
+            }
+            .sensoryFeedback(.success, trigger: saveTrigger)
+        }
+    }
+
+    private func refreshForCurrentDay() {
+        dayTracker.refreshIfNeeded()
+        Task {
+            await healthKit.refreshIfNeeded()
+        }
+    }
+}
+
 private struct TodayListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(HealthKitManager.self) private var healthKit
     @Query private var todaysProducts: [Product]
+    @State private var deletionTrigger = 0
+    @State private var productPendingEdit: Product?
 
     private let theme: ColorPreset
     private let dayStart: Date
@@ -124,23 +166,35 @@ private struct TodayListView: View {
                 )
             }
 
-            Section {
-                if todaysProducts.isEmpty {
+            if !todaysProducts.isEmpty {
+                Section {
+                    ForEach(todaysProducts) { product in
+                        Button {
+                            productPendingEdit = product
+                        } label: {
+                            ProductRowView(product: product, theme: theme)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .onDelete(perform: deleteProducts)
+                } header: {
+                    Text("Entries")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
                     emptyState
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
-                } else {
-                    ForEach(todaysProducts) { product in
-                        ProductRow(product: product, theme: theme)
-                    }
-                    .onDelete(perform: deleteProducts)
                 }
-            } header: {
-                Text("Entries")
-                    .foregroundStyle(theme.secondary)
             }
         }
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, 96, for: .scrollContent)
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: deletionTrigger)
+        .sheet(item: $productPendingEdit) { product in
+            EditFoodView(product: product)
+        }
         .onAppear(perform: syncWidgetData)
         .onChange(of: energySummary) { _, _ in
             syncWidgetData()
@@ -161,31 +215,26 @@ private struct TodayListView: View {
                 dayStart: dayStart,
                 eatenKcal: energySummary.eatenKcal,
                 burnedKcal: burnedKcal,
-                themeID: theme.rawValue,
+                themeID: theme.rawValue
             )
         )
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "leaf.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(theme.brandGradient)
-            Text("No food logged today")
-                .font(.headline)
+        ContentUnavailableView {
+            Label("No food logged today", systemImage: "leaf.fill")
+        } description: {
             Text("Tap + to add a custom product or pick a fruit/veggie preset.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.vertical, 12)
     }
 
     private func deleteProducts(offsets: IndexSet) {
         withAnimation {
             offsets.map { todaysProducts[$0] }.forEach(modelContext.delete)
         }
+        deletionTrigger += 1
         Task { await healthKit.refreshIfNeeded() }
     }
 
@@ -197,47 +246,6 @@ private struct TodayListView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
         }
-    }
-}
-
-private struct ProductRow: View {
-    let product: Product
-    let theme: ColorPreset
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(product.name)
-                    .font(.headline)
-                HStack(spacing: 6) {
-                    if let tag = product.tag {
-                        Text(FoodTag.title(for: tag))
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(theme.brandGradient, in: Capsule())
-                            .foregroundStyle(theme.onGradient)
-                    }
-                    Text(
-                        "\(CalorieMath.formatted(product.eatenGramms)) g · "
-                            + "\(CalorieMath.formatted(product.kkalsPer100g)) kcal/100g"
-                    )
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("~\(product.formattedKcal)")
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.accent)
-                Text("kcal")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 

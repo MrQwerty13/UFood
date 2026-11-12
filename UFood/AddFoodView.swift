@@ -5,8 +5,8 @@
 //  Created by Михаил Позур on 10.11.2026.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 struct AddFoodView: View {
@@ -27,6 +27,9 @@ struct AddFoodView: View {
     @State private var newTagName = ""
     @State private var tagErrorMessage: String?
     @State private var didCopyPrompt = false
+    @State private var saveTrigger = 0
+
+    var onSaved: (() -> Void)?
 
     private var theme: ColorPreset { .resolved(from: selectedPresetRaw) }
     private var aiProvider: AIAssistant.Provider { .resolved(from: selectedAIProviderRaw) }
@@ -52,21 +55,27 @@ struct AddFoodView: View {
         let kcalText = kkalsPer100gText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !kcalText.isEmpty {
             guard let value = kkalsPer100g else {
-                return "Enter a valid number for kcal per 100g."
+                return String(localized: "Enter a valid number for kcal per 100g.")
             }
             if value <= 0 {
-                return "Kcal per 100g must be greater than zero."
+                return String(localized: "Kcal per 100g must be greater than zero.")
             }
         }
 
         let gramsText = eatenGrammsText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !gramsText.isEmpty {
             guard let value = eatenGramms else {
-                return "Enter a valid number for grams eaten."
+                return String(localized: "Enter a valid number for grams eaten.")
             }
             if value <= 0 {
-                return "Grams eaten must be greater than zero."
+                return String(localized: "Grams eaten must be greater than zero.")
             }
+        }
+
+        if trimmedName.isEmpty,
+           !kkalsPer100gText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !eatenGrammsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return String(localized: "Enter a product name.")
         }
 
         return nil
@@ -100,13 +109,16 @@ struct AddFoodView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .frame(minHeight: AppCardStyle.minTapSize)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .fontWeight(.semibold)
                         .disabled(!isValid)
+                        .frame(minHeight: AppCardStyle.minTapSize)
                 }
             }
+            .sensoryFeedback(.success, trigger: saveTrigger)
             .alert("Prompt copied", isPresented: $didCopyPrompt) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -145,20 +157,30 @@ struct AddFoodView: View {
     }
 
     private var customSection: some View {
-        Section("Custom / edit") {
-            TextField("Name", text: $name)
-                .textInputAutocapitalization(.words)
+        Section {
+            LabeledContent("Name") {
+                TextField("Name", text: $name)
+                    .textInputAutocapitalization(.words)
+                    .multilineTextAlignment(.trailing)
+            }
 
-            TextField("kcal per 100g", text: $kkalsPer100gText)
-                .keyboardType(.decimalPad)
+            LabeledContent("kcal per 100g") {
+                TextField("0", text: $kkalsPer100gText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+            }
 
-            TextField("Grams eaten", text: $eatenGrammsText)
-                .keyboardType(.decimalPad)
+            LabeledContent("Grams eaten") {
+                TextField("0", text: $eatenGrammsText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+            }
 
             if let validationMessage {
                 Text(validationMessage)
                     .font(.footnote)
                     .foregroundStyle(.red)
+                    .accessibilityLabel(Text(validationMessage))
             }
 
             Menu {
@@ -182,7 +204,12 @@ struct AddFoodView: View {
                 }
             } label: {
                 Label("Ask AI how many grams", systemImage: "sparkles")
+                    .frame(minHeight: AppCardStyle.minTapSize)
             }
+        } header: {
+            Text("Custom / edit")
+        } footer: {
+            Text("Use a comma or a dot for decimals.")
         }
     }
 
@@ -199,6 +226,7 @@ struct AddFoodView: View {
                     .textInputAutocapitalization(.words)
                 Button("Add tag", systemImage: "plus", action: addTag)
                     .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .frame(minHeight: AppCardStyle.minTapSize)
             }
 
             if let tagErrorMessage {
@@ -214,10 +242,20 @@ struct AddFoodView: View {
             HStack {
                 Text("This entry")
                 Spacer()
-                Text("~\(CalorieMath.formatted(previewKcal)) kcal")
+                Text("\(CalorieMath.integerKcal(previewKcal)) kcal")
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(theme.accent)
+                    .contentTransition(.numericText())
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                Text(
+                    String(
+                        format: appString("This entry: %@"),
+                        CalorieMath.accessibilityKcalPhrase(previewKcal)
+                    )
+                )
+            )
         }
     }
 
@@ -260,6 +298,8 @@ struct AddFoodView: View {
             tag: selectedTag
         )
         modelContext.insert(product)
+        saveTrigger += 1
+        onSaved?()
         Task {
             await healthKit.saveDietaryEnergy(kcal: product.kcal, at: product.timestamp)
         }
@@ -279,11 +319,15 @@ private struct PresetChip: View {
                 Text(preset.name)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(isSelected ? theme.onGradient : .primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
                 Text("\(CalorieMath.formatted(preset.kkalsPer100g)) kcal/100g")
                     .font(.caption)
                     .foregroundStyle(isSelected ? theme.onGradient.opacity(0.9) : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: AppCardStyle.minTapSize, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background {
@@ -295,9 +339,9 @@ private struct PresetChip: View {
                     }
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppCardStyle.rowCorner, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: AppCardStyle.rowCorner, style: .continuous)
                     .strokeBorder(
                         isSelected ? Color.clear : theme.secondary.opacity(0.35),
                         lineWidth: 1
@@ -305,6 +349,9 @@ private struct PresetChip: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(
+            Text("\(preset.name), \(CalorieMath.formatted(preset.kkalsPer100g)) kcal/100g")
+        )
     }
 }
 
@@ -312,5 +359,6 @@ private struct PresetChip: View {
     AddFoodView()
         .environment(HealthKitManager())
         .environment(FoodPresetStore())
+        .environment(FoodTagStore())
         .modelContainer(for: Product.self, inMemory: true)
 }

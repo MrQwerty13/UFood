@@ -60,8 +60,18 @@ enum ColorPreset: String, CaseIterable, Identifiable {
     }
 }
 
-enum ThemeStorage {
-    static let key = "selectedColorPreset"
+nonisolated enum ThemeStorage {
+    nonisolated static let key = "selectedColorPreset"
+}
+
+/// Shared layout tokens for cards and metric tiles across the app.
+enum AppCardStyle {
+    static let outerCorner: CGFloat = 28
+    static let innerCorner: CGFloat = 18
+    static let rowCorner: CGFloat = 16
+    static let spacing: CGFloat = 12
+    static let padding: CGFloat = 16
+    static let minTapSize: CGFloat = 44
 }
 
 struct ColorPresetSwatch: View {

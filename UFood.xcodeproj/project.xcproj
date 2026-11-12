@@ -26,14 +26,9 @@
           ],
         },
       ],
-    }, {
-      "kind": "folder",
-      "path": "WidgetShared",
-      "target-membership": [
-        "UFood",
-        "UFoodWidgetExtension",
-      ],
-    }, {
+    },
+    { "kind": "folder", "path": "WidgetShared", "target-membership": [ "UFood", "UFoodWidgetExtension" ] },
+    {
       "kind": "folder",
       "path": "UFoodWidget",
       "target-membership": [
@@ -63,6 +58,9 @@
       "id": "745A08AA30A3274F001E73B3",
       "product": "Products/UFood.app",
       "product-type": "application",
+      "dependencies": [
+        "UFoodWidgetExtension",
+      ],
       "build-phases": [
         "compile-sources",
         "frameworks",
@@ -72,9 +70,6 @@
           "name": "Embed App Extensions",
           "bundle-base-path": "plugins-directory",
         },
-      ],
-      "dependencies": [
-        "745A08AC30A3274F001E73B3",
       ],
       "build-settings": {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
@@ -112,8 +107,7 @@
         "SWIFT_VERSION": "5.0",
         "TARGETED_DEVICE_FAMILY": "1,2",
       },
-    },
-    {
+    }, {
       "name": "UFoodWidgetExtension",
       "id": "745A08AC30A3274F001E73B3",
       "product": "Products/UFoodWidgetExtension.appex",
@@ -137,6 +131,7 @@
           "@executable_path/Frameworks",
           "@executable_path/../../Frameworks",
         ],
+        "MARKETING_VERSION": "1.0",
         "PRODUCT_BUNDLE_IDENTIFIER": "MrQwerty13.UFood.Widget",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "SKIP_INSTALL": "YES",
